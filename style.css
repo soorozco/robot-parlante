@@ -229,48 +229,6 @@ html, body {
   50%      { opacity: 1;   transform: scale(1.15); }
 }
 
-/* === BURBUJA DE DIÁLOGO === */
-.speech-bubble {
-  position: relative;
-  background: var(--bubble-bg);
-  border: 3px solid var(--pink-4);
-  border-radius: 22px;
-  padding: 16px 22px;
-  max-width: min(560px, 92vw);
-  font-size: clamp(15px, 2.2vw, 19px);
-  line-height: 1.4;
-  text-align: center;
-  box-shadow: 0 8px 0 rgba(232, 90, 138, .25);
-  transition: transform .15s ease;
-}
-.speech-bubble.pop {
-  animation: pop .35s ease;
-}
-@keyframes pop {
-  0%   { transform: scale(.85); }
-  60%  { transform: scale(1.06); }
-  100% { transform: scale(1); }
-}
-.speech-bubble::before,
-.speech-bubble::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  border-style: solid;
-  border-color: transparent;
-}
-.speech-bubble::before {
-  top: -22px;
-  border-width: 0 14px 22px 14px;
-  border-bottom-color: var(--pink-4);
-}
-.speech-bubble::after {
-  top: -17px;
-  border-width: 0 11px 18px 11px;
-  border-bottom-color: var(--bubble-bg);
-}
-
 /* === CONTROLES === */
 .controls {
   max-width: min(620px, 92vw);

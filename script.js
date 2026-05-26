@@ -1,6 +1,5 @@
 (() => {
   const robotWrap   = document.getElementById('robotWrap');
-  const bubble      = document.getElementById('bubble');
   const jokeBtn     = document.getElementById('jokeBtn');
   const triviaBtn   = document.getElementById('triviaBtn');
   const stopBtn     = document.getElementById('stopBtn');
@@ -182,14 +181,11 @@
   let activeRetroStopper = null;
   function onTalkError() {
     robotWrap.classList.remove('talking');
-    bubble.textContent = 'Ups, no pude hablar. Intenta de nuevo o cambia de voz.';
   }
 
   function speakText(text) {
     synth.cancel();
     if (activeRetroStopper) { activeRetroStopper(); activeRetroStopper = null; }
-    bubble.textContent = text;
-    bubble.classList.remove('pop'); void bubble.offsetWidth; bubble.classList.add('pop');
     if (retroInput.checked) speakRetro(text); else speakNormal(text);
   }
 
@@ -216,8 +212,8 @@
   stopBtn.addEventListener('click', stopSpeaking);
 
   if (!('speechSynthesis' in window)) {
-    bubble.textContent = 'Tu navegador no soporta la síntesis de voz. Prueba con Chrome, Edge o Safari.';
     jokeBtn.disabled = true;
     triviaBtn.disabled = true;
+    alert('Tu navegador no soporta la síntesis de voz. Prueba con Chrome, Edge o Safari.');
   }
 })();
