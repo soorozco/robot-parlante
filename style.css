@@ -302,13 +302,27 @@ textarea:focus { outline: none; border-color: var(--pink-4); }
   align-items: center;
   margin-top: 10px;
 }
-.voice-label, .rate-label {
-  flex: 1 1 220px;
+.voice-label, .rate-label, .pitch-label {
+  flex: 1 1 200px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 14px;
 }
+.retro-label {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  background: rgba(232, 90, 138, .12);
+  border: 2px dashed var(--pink-3);
+  border-radius: 14px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.retro-label input { width: 18px; height: 18px; accent-color: var(--pink-4); }
 select, input[type="range"] {
   flex: 1;
   padding: 6px 8px;

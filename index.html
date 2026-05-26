@@ -43,10 +43,10 @@
   <section class="controls">
     <textarea
       id="textInput"
-      placeholder="Escribe aquí lo que quieres que diga el robot..."
+      placeholder="Escribe aquí lo que quieres que diga Roboniela..."
       rows="3"
       maxlength="400"
-    >¡Hola Sergio! Soy Roboniela, tu robot parlante.</textarea>
+    ></textarea>
 
     <div class="row">
       <label class="voice-label">
@@ -55,7 +55,15 @@
       </label>
       <label class="rate-label">
         Velocidad:
-        <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="1" />
+        <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="0.88" />
+      </label>
+      <label class="pitch-label">
+        Tono:
+        <input type="range" id="pitch" min="0.3" max="1.2" step="0.05" value="0.55" />
+      </label>
+      <label class="retro-label" title="Habla palabra por palabra con micro-pausas, estilo robot retro">
+        <input type="checkbox" id="retro" checked />
+        Modo robot retro
       </label>
     </div>
 
