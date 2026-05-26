@@ -50,11 +50,18 @@ html, body {
   padding: 28px 16px 8px;
 }
 .title h1 {
-  font-size: clamp(28px, 5vw, 48px);
+  font-family: "Bangers", "Comic Sans MS", "Chalkboard SE", cursive;
+  font-size: clamp(44px, 8vw, 84px);
   margin: 0;
   color: var(--pink-4);
-  text-shadow: 2px 2px 0 #fff, 4px 4px 0 rgba(232, 90, 138, .25);
-  letter-spacing: 1px;
+  text-shadow:
+    3px 3px 0 #fff,
+    6px 6px 0 rgba(232, 90, 138, .35),
+    9px 9px 0 rgba(0, 0, 0, .08);
+  letter-spacing: 3px;
+  line-height: 1;
+  transform: rotate(-2deg);
+  -webkit-text-stroke: 2px var(--pink-4);
 }
 .subtitle {
   margin: 6px 0 0;

@@ -1,6 +1,6 @@
-# Robot Parlante
+# Roboniela
 
-Pequeña aplicación web estática donde un robot rosa **habla en voz alta** lo que tú escribes. Los ojos parpadean, las antenas brillan y la boca se anima al ritmo de la locución.
+Pequeña aplicación web estática donde **Roboniela**, un robot rosa, **habla en voz alta** lo que tú escribes. Los ojos parpadean, las antenas brillan y la boca se anima al ritmo de la locución.
 
 ## Demo
 
