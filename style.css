@@ -154,27 +154,40 @@ html, body {
 }
 
 /* === BOCA (barras tipo ecualizador encima de la boca del robot) === */
-/* Boca centrada en (46.8%, 75.9%). width 10% / height 5.5% → left 41.8%, top 73.2% */
+/* Boca real medida en píxeles: centro (48%, 78.12%), ancho 10.87%, alto 5.99%.
+   Caja 11% × 6.5% → left = 48 - 5.5 = 42.5%, top = 78.12 - 3.25 = 74.87% */
 .mouth {
   position: absolute;
-  left: 41.8%;
-  top: 73.2%;
-  width: 10%;
-  height: 5.5%;
+  left: 42.5%;
+  top: 74.9%;
+  width: 11%;
+  height: 6.5%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6%;
+  gap: 5%;
   pointer-events: none;
+  /* halo de glow detrás de toda la boca */
+  filter: drop-shadow(0 0 6px rgba(255, 80, 140, .6))
+          drop-shadow(0 0 14px rgba(255, 80, 140, .35));
 }
 .mouth span {
   display: block;
-  width: 11%;
-  height: 35%;
-  background: linear-gradient(180deg, #ff5d92, #e63a73);
+  width: 12%;
+  height: 38%;
+  background: linear-gradient(180deg, #ffa3c2, #ff5d92 40%, #e63a73);
   border-radius: 999px;
-  box-shadow: 0 0 8px rgba(255, 93, 146, .8);
+  box-shadow:
+    0 0 6px rgba(255, 200, 220, .9),
+    0 0 12px rgba(255, 93, 146, .85),
+    0 0 22px rgba(255, 93, 146, .55);
   transition: height .12s ease;
+}
+.robot-wrap.talking .mouth {
+  /* glow más intenso cuando habla */
+  filter: drop-shadow(0 0 10px rgba(255, 80, 140, .85))
+          drop-shadow(0 0 22px rgba(255, 80, 140, .55))
+          drop-shadow(0 0 40px rgba(255, 80, 140, .3));
 }
 .robot-wrap.talking .mouth span {
   animation: mouth-bounce .35s ease-in-out infinite;
@@ -186,8 +199,8 @@ html, body {
 .robot-wrap.talking .mouth span:nth-child(5) { animation-delay: 0s;    }
 
 @keyframes mouth-bounce {
-  0%, 100% { height: 25%; }
-  50%      { height: 95%; }
+  0%, 100% { height: 30%; }
+  50%      { height: 100%; }
 }
 
 /* === ANTENAS === */
