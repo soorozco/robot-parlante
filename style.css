@@ -101,6 +101,9 @@ html, body {
 
 /* === OJOS === */
 /* Los porcentajes están calibrados sobre la imagen 2816x1536 */
+/* Posiciones calibradas midiendo píxeles reales de robot.png (2816x1536).
+   Cada .eye es 7% wide; con aspect-ratio:1 su alto en % de height es 7% * (2816/1536) = 12.83%.
+   Centramos en (41.53%, 63.02%) izq y (54.63%, 63.10%) der → left = center - 3.5%, top = center - 6.4%. */
 .eye {
   position: absolute;
   width: 7%;
@@ -114,8 +117,8 @@ html, body {
   animation: eye-pulse 2.6s ease-in-out infinite;
   mix-blend-mode: screen;
 }
-.eye-left  { left: 33.5%; top: 51%; }
-.eye-right { left: 46.5%; top: 51%; }
+.eye-left  { left: 38.0%; top: 56.6%; }
+.eye-right { left: 51.1%; top: 56.7%; }
 
 @keyframes eye-pulse {
   0%, 100% {
@@ -151,10 +154,11 @@ html, body {
 }
 
 /* === BOCA (barras tipo ecualizador encima de la boca del robot) === */
+/* Boca centrada en (46.8%, 75.9%). width 10% / height 5.5% → left 41.8%, top 73.2% */
 .mouth {
   position: absolute;
-  left: 44%;
-  top: 76%;
+  left: 41.8%;
+  top: 73.2%;
   width: 10%;
   height: 5.5%;
   display: flex;
@@ -199,8 +203,12 @@ html, body {
   pointer-events: none;
   animation: antenna-blink 1.8s ease-in-out infinite;
 }
-.antenna-left  { left: 36%;  top: 16%; }
-.antenna-right { left: 52%;  top: 18%; }
+/* Antenas (calibradas con detección de píxeles brillantes coral-rosa).
+   Bola izq centrada en (37.7%, 24.7%) y der en (56.0%, 17.7%) — la der queda parcialmente tapada por el cabello.
+   width 4% / aspect 1 → en % de height es 4%*1.833 = 7.33%
+   left = center_x - 2%, top = center_y - 3.66% */
+.antenna-left  { left: 35.7%; top: 21.0%; }
+.antenna-right { left: 59.5%; top: 22.5%; }
 .antenna-right { animation-delay: .9s; }
 
 @keyframes antenna-blink {
