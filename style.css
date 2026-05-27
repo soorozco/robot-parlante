@@ -319,6 +319,94 @@ select, input[type="range"] {
   text-align: center;
 }
 .btn.big .emoji { font-size: 26px; line-height: 1; }
+
+/* El botón Sorpréndeme es especial: con gradiente arcoiris y animación */
+.btn.big.surprise {
+  background: linear-gradient(120deg, #ff7aa8, #c084fc 35%, #60a5fa 70%, #34d399);
+  background-size: 220% 100%;
+  box-shadow: 0 5px 0 #6b3d8a;
+  animation: surprise-gradient 6s linear infinite;
+  border: 2px solid #fff;
+}
+.btn.big.surprise:hover {
+  transform: translateY(-2px) rotate(-1deg);
+  box-shadow: 0 7px 0 #6b3d8a, 0 0 20px rgba(192, 132, 252, .6);
+}
+.btn.big.surprise:active { transform: translateY(2px); box-shadow: 0 2px 0 #6b3d8a; }
+@keyframes surprise-gradient {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 220% 50%; }
+}
+
+/* === Caja sorpresa visual (fotos, links) === */
+.surprise-box {
+  position: relative;
+  margin: 16px auto;
+  background: #fff;
+  border: 3px solid var(--pink-4);
+  border-radius: 20px;
+  padding: 18px 18px 14px;
+  max-width: 100%;
+  box-shadow: 0 10px 0 rgba(232, 90, 138, .25);
+  animation: pop-in .35s ease;
+}
+@keyframes pop-in {
+  0%   { transform: scale(.85); opacity: 0; }
+  60%  { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.surprise-box .close-surprise {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: var(--pink-4);
+  color: #fff;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 22px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.surprise-box .close-surprise:hover { background: #b73c6a; }
+.surprise-caption {
+  text-align: center;
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: var(--text);
+  font-weight: bold;
+}
+.surprise-box .loading {
+  text-align: center;
+  font-size: 16px;
+  color: var(--pink-4);
+  margin: 12px 0;
+}
+.surprise-box .pet-photo {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: 360px;
+  border-radius: 14px;
+  border: 3px solid var(--pink-2);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .15);
+}
+.surprise-link {
+  display: inline-block;
+  background: linear-gradient(180deg, #ff7aa8, var(--pink-4));
+  color: #fff;
+  text-decoration: none;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-weight: bold;
+  box-shadow: 0 4px 0 #b73c6a;
+}
+.surprise-link:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #b73c6a; }
 .row.buttons, .row > #stopBtn {
   margin: 0 auto;
 }

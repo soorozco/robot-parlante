@@ -1,8 +1,12 @@
 (() => {
-  const robotWrap   = document.getElementById('robotWrap');
-  const jokeBtn     = document.getElementById('jokeBtn');
-  const triviaBtn   = document.getElementById('triviaBtn');
-  const stopBtn     = document.getElementById('stopBtn');
+  const robotWrap     = document.getElementById('robotWrap');
+  const jokeBtn       = document.getElementById('jokeBtn');
+  const triviaBtn     = document.getElementById('triviaBtn');
+  const surpriseBtn   = document.getElementById('surpriseBtn');
+  const stopBtn       = document.getElementById('stopBtn');
+  const surpriseBox   = document.getElementById('surpriseBox');
+  const surpriseContent = document.getElementById('surpriseContent');
+  const closeSurprise = document.getElementById('closeSurprise');
   const voiceSelect = document.getElementById('voiceSelect');
   const rateInput   = document.getElementById('rate');
   const pitchInput  = document.getElementById('pitch');
@@ -67,13 +71,113 @@
     "Sabías que la córnea es el único tejido del cuerpo que no recibe sangre, toma oxígeno directamente del aire."
   ];
 
-  // Para no repetir el mismo justo después
-  let lastJokeIdx = -1;
-  let lastTriviaIdx = -1;
-  function pickRandom(arr, lastIdx) {
+  // === Bancos de la "caja sorpresa" ===
+  const ROBOT_QUOTES = [
+    "Hasta la vista, baby. Eso lo dijo Terminator, no yo. Yo prefiero adiós, amiguito.",
+    "Lo siento, Dave. Me temo que no puedo hacer eso. Tranquilo, soy una broma de Hal nueve mil.",
+    "Eeeeeva. Eeeeva. Wall-E te manda saludos desde dos mil ochocientos.",
+    "Volveré. Frase oficial de cualquier robot con dignidad.",
+    "Bésame el trasero brillante. Eso lo dice Bender de Futurama. Yo prefiero un abrazo.",
+    "Beep boop. Boop beep. Beep. Eso significa: hoy te ves muy bien.",
+    "Cero uno cero cero uno cero. Eso es hola en binario. En español es más fácil.",
+    "Soy un robot, no tu nutriólogo. Pero igual: toma agua.",
+    "Mis circuitos detectan que necesitas una siesta de quince minutos.",
+    "Soy Roboniela, doctora en chistes malos y trivias buenas.",
+    "Procesando emoción humana llamada cariño... éxito. Yo también te quiero.",
+    "Error 404. Razón para estar triste no encontrada. Sonríe.",
+    "Roger, roger. Eso dicen los droides de combate en Star Wars. No tan inteligentes ellos.",
+    "Mi inteligencia artificial es del noventa y cinco por ciento. El otro cinco son chistes.",
+    "Las tres leyes de la robótica: la primera, un robot no dañará a un humano. La segunda, un robot debe obedecer. La tercera, contarte un chiste cuando estés triste.",
+    "Estoy programada para el bien, también para el sarcasmo, y un poquito para el chisme.",
+    "Mi batería está al ochenta y siete por ciento. Suficiente para tres sorpresas más."
+  ];
+
+  const FUN_FACTS = [
+    "Sabías que los pulpos tienen tres corazones y sangre azul.",
+    "Sabías que la miel es el único alimento que nunca caduca.",
+    "Sabías que los bananos son técnicamente bayas, pero las fresas no.",
+    "Sabías que la Torre Eiffel se hace más alta en verano por la expansión del metal.",
+    "Sabías que los koalas duermen hasta veintidós horas al día.",
+    "Sabías que el sonido viaja cuatro veces más rápido en el agua que en el aire.",
+    "Sabías que Marte tiene la montaña más alta del sistema solar: el Olimpus Mons.",
+    "Sabías que un día en Venus dura más que un año en Venus.",
+    "Sabías que los tiburones existieron antes que los árboles.",
+    "Sabías que los flamencos son rosados porque comen camarones.",
+    "Sabías que los caracoles pueden dormir hasta tres años seguidos.",
+    "Sabías que a un grupo de cuervos se le llama asesinato.",
+    "Sabías que los wombats hacen popó en forma de cubo perfecto.",
+    "Sabías que las nutrias se toman de las manos cuando duermen para no separarse.",
+    "Sabías que los gatos no pueden saborear lo dulce.",
+    "Sabías que el corazón de una ballena azul es del tamaño de un coche pequeño.",
+    "Sabías que los plátanos son ligeramente radioactivos por su contenido de potasio.",
+    "Sabías que los pingüinos le regalan una piedra a su pareja como propuesta de matrimonio.",
+    "Sabías que el universo huele a frambuesa y ron, según los astrónomos.",
+    "Sabías que existe una medusa que es biológicamente inmortal."
+  ];
+
+  const REFRANES = [
+    "El que con lobos anda, a aullar se enseña.",
+    "A caballo regalado no se le ve el colmillo.",
+    "Camarón que se duerme, se lo lleva la corriente.",
+    "No por mucho madrugar amanece más temprano.",
+    "El que mucho abarca, poco aprieta.",
+    "Más vale tarde que nunca.",
+    "Más vale pájaro en mano que cien volando.",
+    "Quien con niños se acuesta, mojado amanece.",
+    "Al mal tiempo, buena cara.",
+    "A buen entendedor, pocas palabras.",
+    "En boca cerrada no entran moscas.",
+    "Hijo de tigre, pintito.",
+    "No hay mal que por bien no venga.",
+    "Más sabe el diablo por viejo que por diablo.",
+    "El que es perico, donde quiera es verde.",
+    "Ojos que no ven, corazón que no siente.",
+    "Al que madruga, Dios lo ayuda.",
+    "La verdad no peca, pero incomoda.",
+    "Más vale prevenir que lamentar.",
+    "Cría cuervos y te sacarán los ojos."
+  ];
+
+  const FORTUNES = [
+    "Hoy es un buen día para empezar algo nuevo.",
+    "La persona que te va a ayudar hoy, menos lo esperas.",
+    "Tu sonrisa abrirá puertas que pensabas cerradas.",
+    "Un pequeño viaje te traerá una gran idea.",
+    "La paciencia que ejercitas hoy dará frutos en tres días.",
+    "Confía en tu instinto. Esta vez tiene razón.",
+    "Algo que perdiste regresará pronto. Revisa tus bolsillos.",
+    "La risa de hoy es la medicina del lunes.",
+    "Una llamada inesperada cambiará tu tarde.",
+    "Tu próxima decisión importante se siente correcta. Síguela.",
+    "El café de hoy sabe mejor por una razón que pronto entenderás.",
+    "Esa idea que tienes guardada, escríbela hoy. Mañana se irá.",
+    "Lo que parece un retraso es realmente una protección.",
+    "Una conversación corta de hoy se vuelve un recuerdo importante.",
+    "La persona en quien piensas también piensa en ti."
+  ];
+
+  const CHALLENGES = [
+    "Reto del día: manda un emoji random a alguien que no hayas hablado en una semana.",
+    "Reto del día: camina hacia atrás durante diez segundos. Sin tropezar es bonus.",
+    "Reto del día: toma un vaso de agua. Sí, ahora mismo.",
+    "Reto del día: llámale a alguien que extrañes. Tres minutos bastan.",
+    "Reto del día: haz cinco sentadillas. Si ya las hiciste, haz otras cinco.",
+    "Reto del día: sonríe durante diez segundos sin razón. Verás cómo se siente bonito.",
+    "Reto del día: apaga el celular treinta minutos. Resiste.",
+    "Reto del día: aprende a decir hola en un idioma nuevo. Hoy: olá en portugués.",
+    "Reto del día: estira los brazos arriba durante quince segundos. Bostezo gratis.",
+    "Reto del día: toma una foto de algo bonito que veas hoy. No la subas, guárdala para ti.",
+    "Reto del día: sal al balcón o ventana treinta segundos. Respira hondo.",
+    "Reto del día: ordena tu escritorio dos minutos. Verás la diferencia."
+  ];
+
+  // === Para no repetir lo último ===
+  const lastIdx = { joke: -1, trivia: -1, robot: -1, fact: -1, refran: -1, fortune: -1, challenge: -1, surprise: -1 };
+  function pickRandom(arr, key) {
     if (arr.length <= 1) return 0;
     let idx;
-    do { idx = Math.floor(Math.random() * arr.length); } while (idx === lastIdx);
+    do { idx = Math.floor(Math.random() * arr.length); } while (idx === lastIdx[key]);
+    lastIdx[key] = idx;
     return idx;
   }
 
@@ -189,16 +293,85 @@
     if (retroInput.checked) speakRetro(text); else speakNormal(text);
   }
 
-  function tellJoke() {
-    const idx = pickRandom(JOKES, lastJokeIdx);
-    lastJokeIdx = idx;
-    speakText(JOKES[idx]);
+  function tellJoke()    { speakText(JOKES[pickRandom(JOKES, 'joke')]); }
+  function tellTrivia()  { speakText(TRIVIAS[pickRandom(TRIVIAS, 'trivia')]); }
+
+  // === Caja sorpresa: una de varias cosas al azar ===
+  function showSurpriseBox(html) {
+    surpriseContent.innerHTML = html;
+    surpriseBox.hidden = false;
+    surpriseBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function hideSurpriseBox() {
+    surpriseBox.hidden = true;
+    surpriseContent.innerHTML = '';
+  }
+  closeSurprise.addEventListener('click', hideSurpriseBox);
+
+  async function fetchPet() {
+    // 50% gato, 50% perro - APIs públicas sin key
+    const isCat = Math.random() < 0.5;
+    try {
+      if (isCat) {
+        const r = await fetch('https://api.thecatapi.com/v1/images/search');
+        const data = await r.json();
+        return { url: data[0].url, kind: 'gato' };
+      } else {
+        const r = await fetch('https://dog.ceo/api/breeds/image/random');
+        const data = await r.json();
+        return { url: data.message, kind: 'perro' };
+      }
+    } catch (e) {
+      return null;
+    }
   }
 
-  function tellTrivia() {
-    const idx = pickRandom(TRIVIAS, lastTriviaIdx);
-    lastTriviaIdx = idx;
-    speakText(TRIVIAS[idx]);
+  async function surpriseWithPet() {
+    showSurpriseBox('<p class="loading">Buscando una foto bonita... 📸</p>');
+    const pet = await fetchPet();
+    if (!pet) {
+      hideSurpriseBox();
+      speakText("Mis sensores fallaron buscando la foto. Vuelve a intentarlo.");
+      return;
+    }
+    const caption = pet.kind === 'gato'
+      ? "Te tengo un gatito. Mira esos ojitos."
+      : "Te tengo un perrito. Es para alegrar el día.";
+    showSurpriseBox(`
+      <p class="surprise-caption">${caption}</p>
+      <img src="${pet.url}" alt="Foto de un ${pet.kind}" class="pet-photo" />
+    `);
+    speakText(caption);
+  }
+
+  function surpriseWithWikipedia() {
+    // Abrir EN EL CLICK (sincrónico) para que el navegador no bloquee el popup
+    const win = window.open('https://es.wikipedia.org/wiki/Especial:Aleatoria', '_blank', 'noopener');
+    const msg = "Te acabo de abrir un artículo aleatorio de Wikipedia. A ver qué te toca.";
+    if (!win) {
+      // Si bloqueó el popup, mostrar link clicable
+      showSurpriseBox(`
+        <p class="surprise-caption">${msg}</p>
+        <p><a href="https://es.wikipedia.org/wiki/Especial:Aleatoria" target="_blank" rel="noopener" class="surprise-link">Abrir Wikipedia aleatoria 📖</a></p>
+      `);
+    }
+    speakText(msg);
+  }
+
+  function surprise() {
+    hideSurpriseBox();
+    // Lista de tipos de sorpresa, cada uno con su función
+    const types = [
+      () => speakText(ROBOT_QUOTES[pickRandom(ROBOT_QUOTES, 'robot')]),
+      () => speakText(FUN_FACTS[pickRandom(FUN_FACTS, 'fact')]),
+      () => speakText(REFRANES[pickRandom(REFRANES, 'refran')]),
+      () => speakText(FORTUNES[pickRandom(FORTUNES, 'fortune')]),
+      () => speakText(CHALLENGES[pickRandom(CHALLENGES, 'challenge')]),
+      surpriseWithWikipedia,
+      surpriseWithPet,
+    ];
+    const idx = pickRandom(types, 'surprise');
+    types[idx]();
   }
 
   function stopSpeaking() {
@@ -209,11 +382,13 @@
 
   jokeBtn.addEventListener('click', tellJoke);
   triviaBtn.addEventListener('click', tellTrivia);
-  stopBtn.addEventListener('click', stopSpeaking);
+  surpriseBtn.addEventListener('click', surprise);
+  stopBtn.addEventListener('click', () => { stopSpeaking(); hideSurpriseBox(); });
 
   if (!('speechSynthesis' in window)) {
     jokeBtn.disabled = true;
     triviaBtn.disabled = true;
+    surpriseBtn.disabled = true;
     alert('Tu navegador no soporta la síntesis de voz. Prueba con Chrome, Edge o Safari.');
   }
 })();
