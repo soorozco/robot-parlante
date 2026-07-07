@@ -37,15 +37,19 @@
   <section class="controls">
     <!-- Setup de API key (visible cuando no hay key guardada) -->
     <div id="apiKeySetup" class="api-setup">
-      <h2>🔑 Configura tu API Key de Anthropic</h2>
-      <p>Roboniela usa Claude para redactar. Tu API key se guarda <strong>solo en este navegador</strong> (localStorage). Nunca se sube al repositorio ni se comparte.</p>
-      <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false" />
+      <h2>🔑 Configura tu API</h2>
+      <p>Roboniela redacta usando un modelo de IA. Tu API key se guarda <strong>solo en este navegador</strong> (localStorage). Nunca se sube al repositorio ni se comparte.</p>
+
+      <label class="settings-label">Proveedor:
+        <select id="providerSelect">
+          <option value="deepseek">DeepSeek — más barato (prepago desde $2 USD)</option>
+          <option value="anthropic">Anthropic Claude — pago mensual</option>
+        </select>
+      </label>
+
+      <input type="password" id="apiKeyInput" placeholder="sk-..." autocomplete="off" spellcheck="false" />
       <button id="saveKeyBtn" class="btn primary">Guardar y empezar</button>
-      <p class="hint">
-        ¿Aún no tienes? Consíguela en
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
-        Cuesta ~$0.003 USD por nota con Sonnet.
-      </p>
+      <p class="hint" id="providerHint"></p>
     </div>
 
     <!-- UI principal (visible cuando ya hay key) -->
@@ -94,12 +98,14 @@
       <summary>⚙️ Ajustes avanzados</summary>
 
       <div class="settings-row">
-        <label class="settings-label">Modelo de Claude:
-          <select id="modelSelect">
-            <option value="claude-sonnet-5">Sonnet 5 — recomendado (balance)</option>
-            <option value="claude-haiku-4-5-20251001">Haiku 4.5 — más barato/rápido</option>
-            <option value="claude-opus-4-8">Opus 4.8 — más potente</option>
+        <label class="settings-label">Proveedor:
+          <select id="providerSettingsSelect">
+            <option value="deepseek">DeepSeek</option>
+            <option value="anthropic">Anthropic Claude</option>
           </select>
+        </label>
+        <label class="settings-label">Modelo:
+          <select id="modelSelect"></select>
         </label>
       </div>
 

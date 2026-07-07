@@ -1,73 +1,153 @@
 (() => {
   // === Elementos ===
-  const robotWrap      = document.getElementById('robotWrap');
-  const apiKeySetup    = document.getElementById('apiKeySetup');
-  const apiKeyInput    = document.getElementById('apiKeyInput');
-  const saveKeyBtn     = document.getElementById('saveKeyBtn');
-  const mainUI         = document.getElementById('mainUI');
-  const typeButtons    = document.querySelectorAll('.type-btn');
-  const patientInput   = document.getElementById('patientInput');
-  const dictateBtn     = document.getElementById('dictateBtn');
-  const dictateLabel   = document.getElementById('dictateLabel');
-  const clearInputBtn  = document.getElementById('clearInputBtn');
-  const generateBtn    = document.getElementById('generateBtn');
-  const outputArea     = document.getElementById('outputArea');
-  const outputContent  = document.getElementById('outputContent');
-  const copyBtn        = document.getElementById('copyBtn');
-  const closeBtn       = document.getElementById('closeBtn');
-  const loadingArea    = document.getElementById('loadingArea');
-  const modelSelect    = document.getElementById('modelSelect');
-  const voiceSelect    = document.getElementById('voiceSelect');
-  const rateInput      = document.getElementById('rate');
-  const pitchInput     = document.getElementById('pitch');
-  const retroInput     = document.getElementById('retro');
-  const changeKeyBtn   = document.getElementById('changeKeyBtn');
-  const clearKeyBtn    = document.getElementById('clearKeyBtn');
+  const robotWrap        = document.getElementById('robotWrap');
+  const apiKeySetup      = document.getElementById('apiKeySetup');
+  const apiKeyInput      = document.getElementById('apiKeyInput');
+  const saveKeyBtn       = document.getElementById('saveKeyBtn');
+  const providerSelect   = document.getElementById('providerSelect');
+  const providerHint     = document.getElementById('providerHint');
+  const mainUI           = document.getElementById('mainUI');
+  const typeButtons      = document.querySelectorAll('.type-btn');
+  const patientInput     = document.getElementById('patientInput');
+  const dictateBtn       = document.getElementById('dictateBtn');
+  const dictateLabel     = document.getElementById('dictateLabel');
+  const clearInputBtn    = document.getElementById('clearInputBtn');
+  const generateBtn      = document.getElementById('generateBtn');
+  const outputArea       = document.getElementById('outputArea');
+  const outputContent    = document.getElementById('outputContent');
+  const copyBtn          = document.getElementById('copyBtn');
+  const closeBtn         = document.getElementById('closeBtn');
+  const loadingArea      = document.getElementById('loadingArea');
+  const modelSelect      = document.getElementById('modelSelect');
+  const providerSettingsSelect = document.getElementById('providerSettingsSelect');
+  const voiceSelect      = document.getElementById('voiceSelect');
+  const rateInput        = document.getElementById('rate');
+  const pitchInput       = document.getElementById('pitch');
+  const retroInput       = document.getElementById('retro');
+  const changeKeyBtn     = document.getElementById('changeKeyBtn');
+  const clearKeyBtn      = document.getElementById('clearKeyBtn');
 
-  const LS_KEY   = 'roboniela.anthropicKey';
-  const LS_MODEL = 'roboniela.model';
-  const LS_TYPE  = 'roboniela.lastType';
+  // === Proveedores de IA soportados ===
+  const PROVIDERS = {
+    deepseek: {
+      name: 'DeepSeek',
+      endpoint: 'https://api.deepseek.com/chat/completions',
+      keyPrefix: 'sk-',
+      keyPlaceholder: 'sk-...',
+      signup: 'https://platform.deepseek.com/api_keys',
+      hint: 'Consíguela en <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">platform.deepseek.com</a>. Prepago desde $2 USD. ~$0.0002 USD por nota con DeepSeek Chat.',
+      models: [
+        { id: 'deepseek-chat',     label: 'DeepSeek Chat — muy barato (recomendado)' },
+        { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner — piensa antes, mejor razonamiento' }
+      ],
+      defaultModel: 'deepseek-chat',
+      format: 'openai'
+    },
+    anthropic: {
+      name: 'Anthropic Claude',
+      endpoint: 'https://api.anthropic.com/v1/messages',
+      keyPrefix: 'sk-ant-',
+      keyPlaceholder: 'sk-ant-api03-...',
+      signup: 'https://console.anthropic.com/settings/keys',
+      hint: 'Consíguela en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. Cobro post-pago. ~$0.003 USD por nota con Sonnet.',
+      models: [
+        { id: 'claude-sonnet-5',           label: 'Sonnet 5 — recomendado' },
+        { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 — más barato' },
+        { id: 'claude-opus-4-8',           label: 'Opus 4.8 — más potente' }
+      ],
+      defaultModel: 'claude-sonnet-5',
+      format: 'anthropic'
+    }
+  };
 
+  // === Storage keys ===
+  const LS_PROVIDER = 'roboniela.provider';
+  const LS_MODEL    = 'roboniela.model';
+  const LS_TYPE     = 'roboniela.lastType';
+  // Guardamos la key por proveedor
+  const lsKeyFor = (p) => `roboniela.key.${p}`;
+
+  let currentProvider = localStorage.getItem(LS_PROVIDER) || 'deepseek';
   let currentNoteType = localStorage.getItem(LS_TYPE) || 'soap';
 
   // === API key management ===
-  function hasKey() { return !!localStorage.getItem(LS_KEY); }
+  function currentKey() { return localStorage.getItem(lsKeyFor(currentProvider)); }
+  function hasKey() { return !!currentKey(); }
+
+  function updateProviderHint() {
+    const p = PROVIDERS[providerSelect.value];
+    providerHint.innerHTML = p.hint;
+    apiKeyInput.placeholder = p.keyPlaceholder;
+  }
+  function populateModelSelect() {
+    const p = PROVIDERS[currentProvider];
+    modelSelect.innerHTML = '';
+    p.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.label;
+      modelSelect.appendChild(opt);
+    });
+    const saved = localStorage.getItem(LS_MODEL);
+    if (saved && p.models.some(m => m.id === saved)) modelSelect.value = saved;
+    else modelSelect.value = p.defaultModel;
+  }
 
   function showSetup() {
     apiKeySetup.hidden = false;
     mainUI.hidden = true;
+    providerSelect.value = currentProvider;
+    updateProviderHint();
     apiKeyInput.value = '';
     setTimeout(() => apiKeyInput.focus(), 100);
   }
-
   function showMain() {
     apiKeySetup.hidden = true;
     mainUI.hidden = false;
-    // Restaurar tipo activo
     typeButtons.forEach(b => b.classList.toggle('active', b.dataset.type === currentNoteType));
+    providerSettingsSelect.value = currentProvider;
+    populateModelSelect();
   }
 
+  providerSelect.addEventListener('change', updateProviderHint);
+
   saveKeyBtn.addEventListener('click', () => {
+    const provider = providerSelect.value;
+    const p = PROVIDERS[provider];
     const k = apiKeyInput.value.trim();
-    if (!k.startsWith('sk-ant-')) {
-      alert('La API key debe empezar con "sk-ant-". Revísala y vuelve a pegar.');
+    if (!k.startsWith(p.keyPrefix)) {
+      alert(`La API key de ${p.name} debe empezar con "${p.keyPrefix}". Revísala y vuelve a pegar.`);
       return;
     }
-    localStorage.setItem(LS_KEY, k);
+    localStorage.setItem(lsKeyFor(provider), k);
+    localStorage.setItem(LS_PROVIDER, provider);
+    currentProvider = provider;
     showMain();
-    speakShort('¡Listo! Ya puedo redactar tus notas. Roboniela en línea.');
+    speakShort('Listo. Ya puedo redactar tus notas.');
   });
   apiKeyInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') saveKeyBtn.click();
   });
 
   changeKeyBtn.addEventListener('click', () => {
-    apiKeyInput.value = localStorage.getItem(LS_KEY) || '';
+    apiKeyInput.value = currentKey() || '';
     showSetup();
   });
   clearKeyBtn.addEventListener('click', () => {
-    if (confirm('¿Seguro que quieres borrar la API key de este navegador?')) {
-      localStorage.removeItem(LS_KEY);
+    if (confirm(`¿Borrar tu API key de ${PROVIDERS[currentProvider].name} de este navegador?`)) {
+      localStorage.removeItem(lsKeyFor(currentProvider));
+      showSetup();
+    }
+  });
+
+  // Cambiar proveedor desde ajustes
+  providerSettingsSelect.addEventListener('change', () => {
+    const newProvider = providerSettingsSelect.value;
+    currentProvider = newProvider;
+    localStorage.setItem(LS_PROVIDER, newProvider);
+    populateModelSelect();
+    if (!hasKey()) {
+      // Si no hay key para este proveedor, mostrar setup
       showSetup();
     }
   });
@@ -82,8 +162,6 @@
   });
 
   // === Modelo ===
-  const savedModel = localStorage.getItem(LS_MODEL);
-  if (savedModel) modelSelect.value = savedModel;
   modelSelect.addEventListener('change', () => {
     localStorage.setItem(LS_MODEL, modelSelect.value);
   });
@@ -196,36 +274,73 @@ Para la vida y función.`
     return SYSTEM_BASE + '\n\n' + FORMATS[type];
   }
 
-  // === Llamada a Claude API ===
-  async function callClaude(userText, type) {
-    const apiKey = localStorage.getItem(LS_KEY);
-    const model = modelSelect.value || 'claude-sonnet-5';
+  // === Llamada al proveedor de IA (DeepSeek o Anthropic) ===
+  async function callAI(userText, type) {
+    const provider = PROVIDERS[currentProvider];
+    const apiKey = currentKey();
+    const model = modelSelect.value || provider.defaultModel;
     const system = buildSystemPrompt(type);
 
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 3000,
-        system,
-        messages: [{ role: 'user', content: userText }]
-      })
-    });
-
-    const data = await r.json();
-    if (!r.ok) {
-      const msg = data?.error?.message || `HTTP ${r.status}`;
-      const type = data?.error?.type || '';
-      throw new Error(`${type}: ${msg}`);
+    let response;
+    try {
+      if (provider.format === 'anthropic') {
+        response = await fetch(provider.endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model, max_tokens: 3000, system,
+            messages: [{ role: 'user', content: userText }]
+          })
+        });
+      } else {
+        // OpenAI-compatible (DeepSeek)
+        response = await fetch(provider.endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model, max_tokens: 3000, temperature: 0.4,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user',   content: userText }
+            ]
+          })
+        });
+      }
+    } catch (e) {
+      // TypeError: Failed to fetch = típicamente CORS o red caída
+      const isCors = e instanceof TypeError && /fetch/i.test(String(e.message));
+      if (isCors) {
+        throw new Error(`El navegador bloqueó la llamada a ${provider.name} (probablemente por CORS). Prueba a cambiar a Anthropic en Ajustes (sí permite llamadas directas), o dime y montamos un mini proxy gratis en Cloudflare Workers para DeepSeek.`);
+      }
+      throw new Error(`Error de red: ${e.message}`);
     }
-    if (!data.content || !data.content[0]) throw new Error('Respuesta vacía de Claude');
-    return data.content.map(b => b.text || '').join('\n');
+
+    let data;
+    try { data = await response.json(); }
+    catch { throw new Error(`Respuesta no-JSON del servidor (HTTP ${response.status}).`); }
+
+    if (!response.ok) {
+      const msg = data?.error?.message || data?.message || `HTTP ${response.status}`;
+      throw new Error(`${provider.name}: ${msg}`);
+    }
+
+    // Extraer texto según formato
+    if (provider.format === 'anthropic') {
+      if (!data.content || !data.content[0]) throw new Error('Respuesta vacía');
+      return data.content.map(b => b.text || '').join('\n');
+    } else {
+      const choice = data.choices && data.choices[0];
+      if (!choice || !choice.message) throw new Error('Respuesta vacía');
+      return choice.message.content || '';
+    }
   }
 
   // === Generar borrador ===
@@ -249,7 +364,7 @@ Para la vida y función.`
     generateBtn.disabled = true;
 
     try {
-      const note = await callClaude(input, currentNoteType);
+      const note = await callAI(input, currentNoteType);
       renderOutput(note);
       speakShort('Borrador listo. Revísalo con calma.');
     } catch (e) {
@@ -274,7 +389,7 @@ Para la vida y función.`
     outputContent.innerHTML = `<div class="error-box">
       <strong>⚠️ Error al generar la nota:</strong>
       <pre>${escapeHtml(msg)}</pre>
-      <p>Verifica: (1) tu API key es válida, (2) tienes crédito en Anthropic, (3) tu conexión funciona.</p>
+      <p>Verifica: (1) tu API key es válida, (2) tienes crédito/prepago en ${PROVIDERS[currentProvider].name}, (3) tu conexión funciona.</p>
     </div>`;
     outputContent.dataset.raw = '';
   }
@@ -485,6 +600,7 @@ Para la vida y función.`
   blinkOccasionally();
 
   // === Arranque ===
+  updateProviderHint();
   if (hasKey()) showMain();
   else          showSetup();
 })();
