@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Roboniela</title>
+  <title>Roboniela · Asistente clínica</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
@@ -12,78 +12,121 @@
 <body>
   <div class="stars" aria-hidden="true"></div>
 
-  <header class="title">
+  <div class="warning-banner" role="alert">
+    ⚠️ <strong>Solo para uso profesional.</strong> No ingreses datos identificables (nombre, expediente, teléfono). Todas las notas generadas son <strong>BORRADOR</strong> y deben ser revisadas y firmadas por un médico calificado antes de integrarse al expediente.
+  </div>
+
+  <header class="title compact">
     <h1>Roboniela</h1>
-    <p class="subtitle">Tu asistente con humor médico 🩺</p>
+    <p class="subtitle">Asistente clínica 🩺 redacta borradores de notas médicas</p>
   </header>
 
-  <main class="stage">
+  <main class="stage compact">
     <div class="robot-wrap" id="robotWrap">
-      <img src="robot.png" alt="Robot rosa con coleta" class="robot-img" />
-
-      <!-- Brillo de los ojos -->
+      <img src="robot.png" alt="Roboniela" class="robot-img" />
       <div class="eye eye-left"></div>
       <div class="eye eye-right"></div>
-
-      <!-- Boca animada (barras tipo ecualizador) -->
       <div class="mouth" id="mouth">
         <span></span><span></span><span></span><span></span><span></span>
       </div>
-
-      <!-- Lucecitas en las antenas -->
       <div class="antenna antenna-left"></div>
       <div class="antenna antenna-right"></div>
     </div>
   </main>
 
   <section class="controls">
-    <div class="row big-buttons">
-      <button id="jokeBtn" class="btn primary big">
-        <span class="emoji" aria-hidden="true">😂</span>
-        <span>Cuéntame un chiste</span>
-      </button>
-      <button id="triviaBtn" class="btn primary big">
-        <span class="emoji" aria-hidden="true">💡</span>
-        <span>Dame una trivia</span>
-      </button>
-      <button id="surpriseBtn" class="btn primary big surprise">
-        <span class="emoji" aria-hidden="true">🎁</span>
-        <span>¡Sorpréndeme!</span>
-      </button>
+    <!-- Setup de API key (visible cuando no hay key guardada) -->
+    <div id="apiKeySetup" class="api-setup">
+      <h2>🔑 Configura tu API Key de Anthropic</h2>
+      <p>Roboniela usa Claude para redactar. Tu API key se guarda <strong>solo en este navegador</strong> (localStorage). Nunca se sube al repositorio ni se comparte.</p>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false" />
+      <button id="saveKeyBtn" class="btn primary">Guardar y empezar</button>
+      <p class="hint">
+        ¿Aún no tienes? Consíguela en
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
+        Cuesta ~$0.003 USD por nota con Sonnet.
+      </p>
     </div>
 
-    <!-- Marco donde aparecen las sorpresas visuales (foto de gato/perro, link a wikipedia, etc.) -->
-    <div id="surpriseBox" class="surprise-box" hidden>
-      <button class="close-surprise" id="closeSurprise" aria-label="Cerrar">×</button>
-      <div class="surprise-content" id="surpriseContent"></div>
-    </div>
+    <!-- UI principal (visible cuando ya hay key) -->
+    <div id="mainUI" hidden>
+      <div class="note-type-selector" role="tablist" aria-label="Tipo de nota">
+        <button class="type-btn active" data-type="soap"    role="tab">📋 SOAP (evolución)</button>
+        <button class="type-btn"        data-type="ingreso" role="tab">🏥 Ingreso</button>
+        <button class="type-btn"        data-type="egreso"  role="tab">📤 Egreso</button>
+      </div>
 
-    <div class="row">
-      <button id="stopBtn" class="btn secondary">Detener</button>
+      <div class="input-area">
+        <label for="patientInput" class="sr-label">Datos clínicos del paciente</label>
+        <textarea
+          id="patientInput"
+          rows="8"
+          placeholder="Describe al paciente (anonimizado): edad, sexo, motivo de consulta, antecedentes relevantes, signos vitales, exploración física, laboratorios, tu impresión diagnóstica y plan tentativo. Roboniela lo va a estructurar en el formato seleccionado. Puedes dictar con el micrófono."
+        ></textarea>
+
+        <div class="input-buttons">
+          <button id="dictateBtn" class="btn secondary" title="Dictar por voz (español)">
+            🎙️ <span id="dictateLabel">Dictar</span>
+          </button>
+          <button id="clearInputBtn" class="btn secondary">🗑️ Limpiar</button>
+          <button id="generateBtn" class="btn primary">📝 Generar borrador</button>
+        </div>
+      </div>
+
+      <div id="outputArea" class="output-area" hidden>
+        <div class="output-header">
+          <span class="output-title">📄 Borrador generado</span>
+          <div class="output-actions">
+            <button id="copyBtn" class="btn small">📋 Copiar</button>
+            <button id="closeBtn" class="btn small secondary">✕ Cerrar</button>
+          </div>
+        </div>
+        <div id="outputContent" class="output-content"></div>
+      </div>
+
+      <div id="loadingArea" class="loading-area" hidden>
+        <div class="spinner"></div>
+        <p>Roboniela está redactando… procesando con Claude 🧠</p>
+      </div>
     </div>
 
     <details class="settings">
-      <summary>⚙️ Ajustes de voz</summary>
-      <div class="row">
-        <label class="voice-label">
-          Voz:
-          <select id="voiceSelect" aria-label="Selecciona voz"></select>
+      <summary>⚙️ Ajustes avanzados</summary>
+
+      <div class="settings-row">
+        <label class="settings-label">Modelo de Claude:
+          <select id="modelSelect">
+            <option value="claude-sonnet-5">Sonnet 5 — recomendado (balance)</option>
+            <option value="claude-haiku-4-5-20251001">Haiku 4.5 — más barato/rápido</option>
+            <option value="claude-opus-4-8">Opus 4.8 — más potente</option>
+          </select>
         </label>
       </div>
-      <div class="row">
-        <label class="rate-label">
-          Velocidad:
-          <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="0.88" />
-        </label>
-        <label class="pitch-label">
-          Tono:
-          <input type="range" id="pitch" min="0.3" max="1.2" step="0.05" value="0.55" />
+
+      <div class="settings-row">
+        <label class="settings-label">Voz de Roboniela:
+          <select id="voiceSelect" aria-label="Voz"></select>
         </label>
       </div>
+
+      <div class="settings-row two-cols">
+        <label class="settings-label">Velocidad:
+          <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="0.95" />
+        </label>
+        <label class="settings-label">Tono:
+          <input type="range" id="pitch" min="0.3" max="1.2" step="0.05" value="0.65" />
+        </label>
+      </div>
+
       <label class="retro-label" title="Habla palabra por palabra con micro-pausas, estilo robot retro">
-        <input type="checkbox" id="retro" checked />
-        Modo robot retro
+        <input type="checkbox" id="retro" />
+        Modo robot retro (avisos cortos)
       </label>
+
+      <div class="settings-row danger-row">
+        <button id="changeKeyBtn" class="btn secondary small">🔑 Cambiar API key</button>
+        <button id="clearKeyBtn"  class="btn danger small">🗑️ Borrar API key de este navegador</button>
+      </div>
     </details>
   </section>
 

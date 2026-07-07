@@ -1,227 +1,479 @@
 (() => {
-  const robotWrap     = document.getElementById('robotWrap');
-  const jokeBtn       = document.getElementById('jokeBtn');
-  const triviaBtn     = document.getElementById('triviaBtn');
-  const surpriseBtn   = document.getElementById('surpriseBtn');
-  const stopBtn       = document.getElementById('stopBtn');
-  const surpriseBox   = document.getElementById('surpriseBox');
-  const surpriseContent = document.getElementById('surpriseContent');
-  const closeSurprise = document.getElementById('closeSurprise');
-  const voiceSelect = document.getElementById('voiceSelect');
-  const rateInput   = document.getElementById('rate');
-  const pitchInput  = document.getElementById('pitch');
-  const retroInput  = document.getElementById('retro');
+  // === Elementos ===
+  const robotWrap      = document.getElementById('robotWrap');
+  const apiKeySetup    = document.getElementById('apiKeySetup');
+  const apiKeyInput    = document.getElementById('apiKeyInput');
+  const saveKeyBtn     = document.getElementById('saveKeyBtn');
+  const mainUI         = document.getElementById('mainUI');
+  const typeButtons    = document.querySelectorAll('.type-btn');
+  const patientInput   = document.getElementById('patientInput');
+  const dictateBtn     = document.getElementById('dictateBtn');
+  const dictateLabel   = document.getElementById('dictateLabel');
+  const clearInputBtn  = document.getElementById('clearInputBtn');
+  const generateBtn    = document.getElementById('generateBtn');
+  const outputArea     = document.getElementById('outputArea');
+  const outputContent  = document.getElementById('outputContent');
+  const copyBtn        = document.getElementById('copyBtn');
+  const closeBtn       = document.getElementById('closeBtn');
+  const loadingArea    = document.getElementById('loadingArea');
+  const modelSelect    = document.getElementById('modelSelect');
+  const voiceSelect    = document.getElementById('voiceSelect');
+  const rateInput      = document.getElementById('rate');
+  const pitchInput     = document.getElementById('pitch');
+  const retroInput     = document.getElementById('retro');
+  const changeKeyBtn   = document.getElementById('changeKeyBtn');
+  const clearKeyBtn    = document.getElementById('clearKeyBtn');
 
+  const LS_KEY   = 'roboniela.anthropicKey';
+  const LS_MODEL = 'roboniela.model';
+  const LS_TYPE  = 'roboniela.lastType';
+
+  let currentNoteType = localStorage.getItem(LS_TYPE) || 'soap';
+
+  // === API key management ===
+  function hasKey() { return !!localStorage.getItem(LS_KEY); }
+
+  function showSetup() {
+    apiKeySetup.hidden = false;
+    mainUI.hidden = true;
+    apiKeyInput.value = '';
+    setTimeout(() => apiKeyInput.focus(), 100);
+  }
+
+  function showMain() {
+    apiKeySetup.hidden = true;
+    mainUI.hidden = false;
+    // Restaurar tipo activo
+    typeButtons.forEach(b => b.classList.toggle('active', b.dataset.type === currentNoteType));
+  }
+
+  saveKeyBtn.addEventListener('click', () => {
+    const k = apiKeyInput.value.trim();
+    if (!k.startsWith('sk-ant-')) {
+      alert('La API key debe empezar con "sk-ant-". Revísala y vuelve a pegar.');
+      return;
+    }
+    localStorage.setItem(LS_KEY, k);
+    showMain();
+    speakShort('¡Listo! Ya puedo redactar tus notas. Roboniela en línea.');
+  });
+  apiKeyInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveKeyBtn.click();
+  });
+
+  changeKeyBtn.addEventListener('click', () => {
+    apiKeyInput.value = localStorage.getItem(LS_KEY) || '';
+    showSetup();
+  });
+  clearKeyBtn.addEventListener('click', () => {
+    if (confirm('¿Seguro que quieres borrar la API key de este navegador?')) {
+      localStorage.removeItem(LS_KEY);
+      showSetup();
+    }
+  });
+
+  // === Selector de tipo ===
+  typeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentNoteType = btn.dataset.type;
+      localStorage.setItem(LS_TYPE, currentNoteType);
+      typeButtons.forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  // === Modelo ===
+  const savedModel = localStorage.getItem(LS_MODEL);
+  if (savedModel) modelSelect.value = savedModel;
+  modelSelect.addEventListener('change', () => {
+    localStorage.setItem(LS_MODEL, modelSelect.value);
+  });
+
+  // === Prompts por tipo de nota ===
+  const SYSTEM_BASE = `Eres Roboniela, una asistente clínica que ayuda a médicos en México a redactar borradores de notas médicas en español.
+
+REGLAS ABSOLUTAS:
+1. NUNCA inventes datos que el médico no haya proporcionado. Si falta algo importante, márcalo entre corchetes: [PENDIENTE: signos vitales completos] o [DATO NO PROPORCIONADO].
+2. Usa terminología médica estándar en español (México). Códigos CIE-10 si es apropiado.
+3. Sé conciso y estructurado. Evita relleno.
+4. Empieza SIEMPRE la respuesta con exactamente esta línea:
+   "🩺 **BORRADOR** — Requiere revisión, edición y firma por médico calificado antes de integrarse al expediente."
+5. Si el médico incluyó datos que parecen identificables (nombres, teléfonos, expedientes), NO los repitas — sustitúyelos por "[paciente]" o similar y agrega una advertencia al final.
+6. Al final, agrega una sección "### 📌 Observaciones para el médico" con:
+   - Datos faltantes que serían útiles.
+   - Alertas clínicas si aplica (banderas rojas, interacciones farmacológicas, etc.).
+   - Sugerencias diagnósticas diferenciales si aplica.
+7. Formato: Markdown limpio con encabezados de nivel 3 (###) para las secciones.
+8. NO uses bloques de código para la nota — es texto médico plano en Markdown.`;
+
+  const FORMATS = {
+    soap: `TIPO: NOTA DE EVOLUCIÓN EN FORMATO SOAP.
+Estructura estrictamente en 4 secciones:
+
+### S — Subjetivo
+Motivo de consulta, evolución sintomática, quejas del paciente, cambios desde última nota. En prosa.
+
+### O — Objetivo
+- **Signos vitales**: TA, FC, FR, T°, SatO2, glucemia si aplica.
+- **Exploración física**: por sistemas relevantes, con hallazgos positivos y negativos importantes.
+- **Estudios/laboratorios**: resultados relevantes con fecha si se dio.
+
+### A — Análisis
+Impresión diagnóstica principal, diagnósticos secundarios, interpretación del cuadro actual. Justifica.
+
+### P — Plan
+- Medicamentos (nombre genérico, dosis, vía, frecuencia).
+- Estudios/interconsultas pendientes.
+- Cuidados y monitoreo.
+- Metas terapéuticas para las próximas 24 h.
+- Comunicación con familia si aplica.`,
+
+    ingreso: `TIPO: NOTA DE INGRESO HOSPITALARIO.
+Estructura en las siguientes secciones:
+
+### Ficha de identificación
+Datos anonimizados: edad, sexo, ocupación si es relevante. NO nombres.
+
+### Motivo de ingreso
+Frase breve.
+
+### Padecimiento actual
+Cronología del padecimiento actual en prosa (inicio, evolución, tratamientos previos, motivo de consulta actual).
+
+### Antecedentes de importancia
+- **Heredofamiliares** relevantes.
+- **Personales patológicos**: comorbilidades, cirugías, alergias, transfusiones.
+- **Personales no patológicos**: tabaquismo, alcoholismo, drogas, alimentación, ejercicio.
+- **Gineco-obstétricos** si aplica.
+
+### Exploración física de ingreso
+- Signos vitales.
+- Estado general.
+- Por sistemas relevantes.
+
+### Estudios iniciales
+Laboratorios y gabinete disponibles al ingreso.
+
+### Diagnósticos de ingreso
+Numerados, con CIE-10 sugerido entre paréntesis si aplica.
+
+### Plan de manejo inicial
+- Servicio a donde se ingresa (medicina interna, urgencias, terapia, etc.).
+- Órdenes médicas iniciales.
+- Estudios pendientes.
+- Interconsultas.
+- Pronóstico inicial.`,
+
+    egreso: `TIPO: NOTA DE EGRESO / ALTA HOSPITALARIA.
+Estructura en las siguientes secciones:
+
+### Resumen de la estancia
+Fechas de ingreso y egreso, servicio, motivo de ingreso, resumen breve de la evolución hospitalaria (2-4 líneas).
+
+### Diagnósticos finales
+Numerados, con CIE-10 si aplica. Distingue principal, secundarios y complicaciones.
+
+### Procedimientos realizados
+Con fechas si se proporcionan.
+
+### Evolución hospitalaria
+Cronología breve por eventos clínicos relevantes (respuesta a tratamiento, complicaciones, cambios de manejo).
+
+### Estado al egreso
+Signos vitales, condición general, capacidad funcional.
+
+### Tratamiento al egreso
+- **Medicamentos**: nombre genérico, dosis, vía, frecuencia, duración.
+- **Dieta/actividad/cuidados**.
+- **Datos de alarma** que debe vigilar el paciente/familia (mínimo 3).
+- **Cita de seguimiento**: servicio y tiempo sugerido.
+- **Estudios ambulatorios pendientes**.
+
+### Pronóstico
+Para la vida y función.`
+  };
+
+  function buildSystemPrompt(type) {
+    return SYSTEM_BASE + '\n\n' + FORMATS[type];
+  }
+
+  // === Llamada a Claude API ===
+  async function callClaude(userText, type) {
+    const apiKey = localStorage.getItem(LS_KEY);
+    const model = modelSelect.value || 'claude-sonnet-5';
+    const system = buildSystemPrompt(type);
+
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 3000,
+        system,
+        messages: [{ role: 'user', content: userText }]
+      })
+    });
+
+    const data = await r.json();
+    if (!r.ok) {
+      const msg = data?.error?.message || `HTTP ${r.status}`;
+      const type = data?.error?.type || '';
+      throw new Error(`${type}: ${msg}`);
+    }
+    if (!data.content || !data.content[0]) throw new Error('Respuesta vacía de Claude');
+    return data.content.map(b => b.text || '').join('\n');
+  }
+
+  // === Generar borrador ===
+  generateBtn.addEventListener('click', async () => {
+    const input = patientInput.value.trim();
+    if (!input) {
+      alert('Escribe o dicta primero los datos del paciente.');
+      patientInput.focus();
+      return;
+    }
+    // Advertencia si detecta posibles datos identificables (heurística simple)
+    const identPattern = /\b(nombre|expediente|exp\.|tel|teléfono|celular|curp|nss|imss|dni|dirección)\b/i;
+    if (identPattern.test(input)) {
+      const ok = confirm('Detecté posibles datos identificables (nombre, expediente, teléfono, etc.). ¿Estás seguro que están anonimizados? Aprieta cancelar para revisar y editar.');
+      if (!ok) return;
+    }
+
+    outputArea.hidden = true;
+    loadingArea.hidden = false;
+    robotWrap.classList.add('talking');
+    generateBtn.disabled = true;
+
+    try {
+      const note = await callClaude(input, currentNoteType);
+      renderOutput(note);
+      speakShort('Borrador listo. Revísalo con calma.');
+    } catch (e) {
+      renderError(e.message);
+      speakShort('Hubo un problema. Revisa el mensaje en pantalla.');
+    } finally {
+      loadingArea.hidden = true;
+      robotWrap.classList.remove('talking');
+      generateBtn.disabled = false;
+    }
+  });
+
+  function renderOutput(markdown) {
+    outputArea.hidden = false;
+    outputContent.innerHTML = mdToHtml(markdown);
+    outputContent.dataset.raw = markdown;
+    outputArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function renderError(msg) {
+    outputArea.hidden = false;
+    outputContent.innerHTML = `<div class="error-box">
+      <strong>⚠️ Error al generar la nota:</strong>
+      <pre>${escapeHtml(msg)}</pre>
+      <p>Verifica: (1) tu API key es válida, (2) tienes crédito en Anthropic, (3) tu conexión funciona.</p>
+    </div>`;
+    outputContent.dataset.raw = '';
+  }
+
+  // === Minimal Markdown → HTML (safe subset) ===
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
+  function mdToHtml(md) {
+    const safe = escapeHtml(md);
+    const lines = safe.split('\n');
+    const out = [];
+    let inList = false;
+    for (let line of lines) {
+      if (/^### /.test(line)) {
+        if (inList) { out.push('</ul>'); inList = false; }
+        out.push('<h3>' + line.replace(/^### /, '') + '</h3>');
+      } else if (/^## /.test(line)) {
+        if (inList) { out.push('</ul>'); inList = false; }
+        out.push('<h2>' + line.replace(/^## /, '') + '</h2>');
+      } else if (/^\s*[-*] /.test(line)) {
+        if (!inList) { out.push('<ul>'); inList = true; }
+        out.push('<li>' + inline(line.replace(/^\s*[-*] /, '')) + '</li>');
+      } else if (line.trim() === '') {
+        if (inList) { out.push('</ul>'); inList = false; }
+        out.push('');
+      } else {
+        if (inList) { out.push('</ul>'); inList = false; }
+        out.push('<p>' + inline(line) + '</p>');
+      }
+    }
+    if (inList) out.push('</ul>');
+    return out.join('\n');
+  }
+  function inline(s) {
+    return s
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>');
+  }
+
+  // === Copiar / Cerrar / Limpiar ===
+  copyBtn.addEventListener('click', async () => {
+    const raw = outputContent.dataset.raw || '';
+    if (!raw) return;
+    try {
+      await navigator.clipboard.writeText(raw);
+      copyBtn.textContent = '✓ Copiado';
+      setTimeout(() => copyBtn.textContent = '📋 Copiar', 1800);
+    } catch {
+      alert('No pude copiar. Selecciona el texto manualmente.');
+    }
+  });
+  closeBtn.addEventListener('click', () => { outputArea.hidden = true; });
+  clearInputBtn.addEventListener('click', () => {
+    if (patientInput.value.trim() && !confirm('¿Borrar todo el texto?')) return;
+    patientInput.value = '';
+    patientInput.focus();
+  });
+
+  // === Web Speech Recognition (dictado) ===
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+  let isDictating = false;
+
+  if (SR) {
+    recognition = new SR();
+    recognition.lang = 'es-MX';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let pendingFinal = '';
+    recognition.onresult = (e) => {
+      let interim = '';
+      let finalText = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i];
+        if (res.isFinal) finalText += res[0].transcript;
+        else interim += res[0].transcript;
+      }
+      if (finalText) {
+        pendingFinal += finalText;
+        appendToTextarea(finalText);
+      }
+      // interim se descarta para no ensuciar el textarea
+    };
+    recognition.onerror = (e) => {
+      console.warn('Speech recognition error:', e.error);
+      stopDictating();
+    };
+    recognition.onend = () => {
+      if (isDictating) {
+        // Auto-reiniciar si sigue "dictando" pero el navegador cortó
+        try { recognition.start(); } catch {}
+      }
+    };
+  } else {
+    dictateBtn.disabled = true;
+    dictateBtn.title = 'Tu navegador no soporta dictado por voz. Usa Chrome, Edge o Safari.';
+  }
+
+  function appendToTextarea(text) {
+    const t = text.trim();
+    if (!t) return;
+    const cur = patientInput.value;
+    const sep = cur && !cur.endsWith(' ') && !cur.endsWith('\n') ? ' ' : '';
+    patientInput.value = cur + sep + t;
+  }
+
+  function startDictating() {
+    if (!recognition) return;
+    try { recognition.start(); isDictating = true; dictateBtn.classList.add('recording'); dictateLabel.textContent = 'Escuchando… (clic para parar)'; }
+    catch (e) { console.warn(e); }
+  }
+  function stopDictating() {
+    isDictating = false;
+    dictateBtn.classList.remove('recording');
+    dictateLabel.textContent = 'Dictar';
+    if (recognition) { try { recognition.stop(); } catch {} }
+  }
+  dictateBtn.addEventListener('click', () => {
+    if (isDictating) stopDictating(); else startDictating();
+  });
+
+  // === Voz de Roboniela (avisos cortos) ===
   const synth = window.speechSynthesis;
   let voices = [];
-
-  // === Banco de chistes de doctores ===
-  const JOKES = [
-    "Doctor, doctor, me duele todo el cuerpo. Donde toco, me duele. Pues debe tener el dedo roto.",
-    "¿Cuál es el colmo de un oftalmólogo? Que su esposa no lo vea con buenos ojos.",
-    "Doctor, doctor, tengo amnesia. ¿Desde cuándo? ¿Desde cuándo qué?",
-    "Paciente: Doctor, ¿es grave? Doctor: Bueno, le diré, no compre nada a plazos largos.",
-    "¿Por qué los médicos siempre escriben mal? Porque la receta es jeroglífica.",
-    "¿Cuál es el doctor más romántico? El cardiólogo, porque siempre le late tu corazón.",
-    "Doctor, doctor, me siento como una cortina. Pues asómese.",
-    "¿Por qué los esqueletos no pelean? Porque no tienen agallas.",
-    "Doctor: Necesita lentes. Paciente: ¿Cómo lo supo? Doctor: Porque entró por la ventana.",
-    "Doctor, no consigo dormir. ¿Ha probado contar ovejas? Sí, pero al llegar a cincuenta mil ya es hora de levantarme.",
-    "¿Cuál es el santo patrón de los anestesiólogos? San Soporífero.",
-    "Doctor, mi marido cree que es una rana. ¿Y desde cuándo? Desde que se cayó al charco. Croac.",
-    "¿Cómo se llama el dentista que va a la guerra? Sacamuelas.",
-    "¿Cuál es el peor diagnóstico médico? El que dice: vuelva en seis meses y veremos.",
-    "Doctor: Veo en su expediente que es hipocondríaco. Paciente: ¿Y eso es grave?",
-    "¿Cuál es la diferencia entre un cirujano y Dios? Que Dios no se cree cirujano.",
-    "¿Por qué los radiólogos son tan tranquilos? Porque ven a través de la gente.",
-    "Paciente: Doctor, me duele aquí cuando me toco. Doctor: Pues no se toque.",
-    "¿Qué le dice un termómetro a otro? Me sacas de quicio.",
-    "¿Cuál es el colmo de un dermatólogo? Que su trabajo le dé sarpullido.",
-    "Doctor, doctor, ¿me podrá curar? Eso depende. ¿De qué? De su seguro médico.",
-    "¿Cuál es el médico favorito de los electricistas? El cardiólogo, porque trata las corrientes.",
-    "¿Por qué la sal fue al doctor? Porque tenía la presión muy alta."
-  ];
-
-  // === Banco de trivias médicas ===
-  const TRIVIAS = [
-    "Sabías que el corazón humano late aproximadamente cien mil veces al día.",
-    "Sabías que un adulto tiene 206 huesos, pero un bebé nace con cerca de 300.",
-    "Sabías que el ácido del estómago es tan fuerte que podría disolver una hoja de afeitar.",
-    "Sabías que la piel es el órgano más grande del cuerpo humano.",
-    "Sabías que el cerebro humano consume el veinte por ciento de la energía del cuerpo.",
-    "Sabías que los pulmones contienen alrededor de trescientos millones de alvéolos.",
-    "Sabías que la sangre tarda menos de un minuto en dar la vuelta completa al cuerpo.",
-    "Sabías que el hígado puede regenerarse incluso si se le extrae el setenta y cinco por ciento.",
-    "Sabías que tu cuerpo produce veinticinco millones de células nuevas cada segundo.",
-    "Sabías que el esmalte dental es la sustancia más dura del cuerpo humano.",
-    "Sabías que los impulsos nerviosos pueden viajar hasta a 432 kilómetros por hora.",
-    "Sabías que producimos alrededor de un litro y medio de saliva al día.",
-    "Sabías que el intestino delgado mide entre 6 y 7 metros de largo.",
-    "Sabías que los riñones filtran unos 180 litros de sangre al día.",
-    "Sabías que los humanos compartimos cerca del cincuenta por ciento de nuestro ADN con los plátanos.",
-    "Sabías que los ojos pueden distinguir alrededor de diez millones de colores diferentes.",
-    "Sabías que la penicilina fue descubierta por accidente en 1928 por Alexander Fleming.",
-    "Sabías que un estornudo viaja a más de 160 kilómetros por hora.",
-    "Sabías que el cuerpo humano contiene alrededor de 37 billones de células.",
-    "Sabías que cada huella digital es única, incluso entre gemelos idénticos.",
-    "Sabías que el músculo más fuerte del cuerpo, en proporción a su tamaño, es el masetero, en la mandíbula.",
-    "Sabías que el sonido más común que perciben los bebés en el vientre es el latido materno.",
-    "Sabías que la fiebre no es la enfermedad, sino una respuesta inmune que ayuda a combatir infecciones.",
-    "Sabías que los huesos del oído son los más pequeños del cuerpo humano: martillo, yunque y estribo.",
-    "Sabías que la córnea es el único tejido del cuerpo que no recibe sangre, toma oxígeno directamente del aire."
-  ];
-
-  // === Bancos de la "caja sorpresa" ===
-  const ROBOT_QUOTES = [
-    "Hasta la vista, baby. Eso lo dijo Terminator, no yo. Yo prefiero adiós, amiguito.",
-    "Lo siento, Dave. Me temo que no puedo hacer eso. Tranquilo, soy una broma de Hal nueve mil.",
-    "Eeeeeva. Eeeeva. Wall-E te manda saludos desde dos mil ochocientos.",
-    "Volveré. Frase oficial de cualquier robot con dignidad.",
-    "Bésame el trasero brillante. Eso lo dice Bender de Futurama. Yo prefiero un abrazo.",
-    "Beep boop. Boop beep. Beep. Eso significa: hoy te ves muy bien.",
-    "Cero uno cero cero uno cero. Eso es hola en binario. En español es más fácil.",
-    "Soy un robot, no tu nutriólogo. Pero igual: toma agua.",
-    "Mis circuitos detectan que necesitas una siesta de quince minutos.",
-    "Soy Roboniela, doctora en chistes malos y trivias buenas.",
-    "Procesando emoción humana llamada cariño... éxito. Yo también te quiero.",
-    "Error 404. Razón para estar triste no encontrada. Sonríe.",
-    "Roger, roger. Eso dicen los droides de combate en Star Wars. No tan inteligentes ellos.",
-    "Mi inteligencia artificial es del noventa y cinco por ciento. El otro cinco son chistes.",
-    "Las tres leyes de la robótica: la primera, un robot no dañará a un humano. La segunda, un robot debe obedecer. La tercera, contarte un chiste cuando estés triste.",
-    "Estoy programada para el bien, también para el sarcasmo, y un poquito para el chisme.",
-    "Mi batería está al ochenta y siete por ciento. Suficiente para tres sorpresas más."
-  ];
-
-  const FUN_FACTS = [
-    "Sabías que los pulpos tienen tres corazones y sangre azul.",
-    "Sabías que la miel es el único alimento que nunca caduca.",
-    "Sabías que los bananos son técnicamente bayas, pero las fresas no.",
-    "Sabías que la Torre Eiffel se hace más alta en verano por la expansión del metal.",
-    "Sabías que los koalas duermen hasta veintidós horas al día.",
-    "Sabías que el sonido viaja cuatro veces más rápido en el agua que en el aire.",
-    "Sabías que Marte tiene la montaña más alta del sistema solar: el Olimpus Mons.",
-    "Sabías que un día en Venus dura más que un año en Venus.",
-    "Sabías que los tiburones existieron antes que los árboles.",
-    "Sabías que los flamencos son rosados porque comen camarones.",
-    "Sabías que los caracoles pueden dormir hasta tres años seguidos.",
-    "Sabías que a un grupo de cuervos se le llama asesinato.",
-    "Sabías que los wombats hacen popó en forma de cubo perfecto.",
-    "Sabías que las nutrias se toman de las manos cuando duermen para no separarse.",
-    "Sabías que los gatos no pueden saborear lo dulce.",
-    "Sabías que el corazón de una ballena azul es del tamaño de un coche pequeño.",
-    "Sabías que los plátanos son ligeramente radioactivos por su contenido de potasio.",
-    "Sabías que los pingüinos le regalan una piedra a su pareja como propuesta de matrimonio.",
-    "Sabías que el universo huele a frambuesa y ron, según los astrónomos.",
-    "Sabías que existe una medusa que es biológicamente inmortal."
-  ];
-
-  const REFRANES = [
-    "El que con lobos anda, a aullar se enseña.",
-    "A caballo regalado no se le ve el colmillo.",
-    "Camarón que se duerme, se lo lleva la corriente.",
-    "No por mucho madrugar amanece más temprano.",
-    "El que mucho abarca, poco aprieta.",
-    "Más vale tarde que nunca.",
-    "Más vale pájaro en mano que cien volando.",
-    "Quien con niños se acuesta, mojado amanece.",
-    "Al mal tiempo, buena cara.",
-    "A buen entendedor, pocas palabras.",
-    "En boca cerrada no entran moscas.",
-    "Hijo de tigre, pintito.",
-    "No hay mal que por bien no venga.",
-    "Más sabe el diablo por viejo que por diablo.",
-    "El que es perico, donde quiera es verde.",
-    "Ojos que no ven, corazón que no siente.",
-    "Al que madruga, Dios lo ayuda.",
-    "La verdad no peca, pero incomoda.",
-    "Más vale prevenir que lamentar.",
-    "Cría cuervos y te sacarán los ojos."
-  ];
-
-  const FORTUNES = [
-    "Hoy es un buen día para empezar algo nuevo.",
-    "La persona que te va a ayudar hoy, menos lo esperas.",
-    "Tu sonrisa abrirá puertas que pensabas cerradas.",
-    "Un pequeño viaje te traerá una gran idea.",
-    "La paciencia que ejercitas hoy dará frutos en tres días.",
-    "Confía en tu instinto. Esta vez tiene razón.",
-    "Algo que perdiste regresará pronto. Revisa tus bolsillos.",
-    "La risa de hoy es la medicina del lunes.",
-    "Una llamada inesperada cambiará tu tarde.",
-    "Tu próxima decisión importante se siente correcta. Síguela.",
-    "El café de hoy sabe mejor por una razón que pronto entenderás.",
-    "Esa idea que tienes guardada, escríbela hoy. Mañana se irá.",
-    "Lo que parece un retraso es realmente una protección.",
-    "Una conversación corta de hoy se vuelve un recuerdo importante.",
-    "La persona en quien piensas también piensa en ti."
-  ];
-
-  const CHALLENGES = [
-    "Reto del día: manda un emoji random a alguien que no hayas hablado en una semana.",
-    "Reto del día: camina hacia atrás durante diez segundos. Sin tropezar es bonus.",
-    "Reto del día: toma un vaso de agua. Sí, ahora mismo.",
-    "Reto del día: llámale a alguien que extrañes. Tres minutos bastan.",
-    "Reto del día: haz cinco sentadillas. Si ya las hiciste, haz otras cinco.",
-    "Reto del día: sonríe durante diez segundos sin razón. Verás cómo se siente bonito.",
-    "Reto del día: apaga el celular treinta minutos. Resiste.",
-    "Reto del día: aprende a decir hola en un idioma nuevo. Hoy: olá en portugués.",
-    "Reto del día: estira los brazos arriba durante quince segundos. Bostezo gratis.",
-    "Reto del día: toma una foto de algo bonito que veas hoy. No la subas, guárdala para ti.",
-    "Reto del día: sal al balcón o ventana treinta segundos. Respira hondo.",
-    "Reto del día: ordena tu escritorio dos minutos. Verás la diferencia."
-  ];
-
-  // === Para no repetir lo último ===
-  const lastIdx = { joke: -1, trivia: -1, robot: -1, fact: -1, refran: -1, fortune: -1, challenge: -1, surprise: -1 };
-  function pickRandom(arr, key) {
-    if (arr.length <= 1) return 0;
-    let idx;
-    do { idx = Math.floor(Math.random() * arr.length); } while (idx === lastIdx[key]);
-    lastIdx[key] = idx;
-    return idx;
-  }
-
-  // === Voces ===
-  const PREFERRED_FEMALE_ES = [
-    'Paulina', 'Mónica', 'Monica', 'Esperanza', 'Helena', 'Sabina', 'Catalina',
-  ];
+  const PREFERRED_ES = ['Paulina', 'Mónica', 'Monica', 'Esperanza', 'Helena', 'Sabina'];
 
   function pickDefaultVoice() {
-    for (const name of PREFERRED_FEMALE_ES) {
-      const v = voices.find(x => x.name.toLowerCase().includes(name.toLowerCase()) &&
-                                 x.lang.toLowerCase().startsWith('es'));
+    for (const name of PREFERRED_ES) {
+      const v = voices.find(x => x.name.toLowerCase().includes(name.toLowerCase()) && x.lang.toLowerCase().startsWith('es'));
       if (v) return v;
     }
-    const mx = voices.find(v => v.lang.toLowerCase().startsWith('es-mx'));
-    if (mx) return mx;
-    const es = voices.find(v => v.lang.toLowerCase().startsWith('es'));
-    if (es) return es;
-    return voices[0];
+    return voices.find(v => v.lang.toLowerCase().startsWith('es-mx'))
+        || voices.find(v => v.lang.toLowerCase().startsWith('es'))
+        || voices[0];
   }
-
   function populateVoices() {
-    voices = synth.getVoices();
+    voices = synth ? synth.getVoices() : [];
+    if (!voiceSelect) return;
+    voiceSelect.innerHTML = '';
     const spanish = voices.filter(v => v.lang.toLowerCase().startsWith('es'));
     const others  = voices.filter(v => !v.lang.toLowerCase().startsWith('es'));
-    const ordered = [...spanish, ...others];
-
-    voiceSelect.innerHTML = '';
-    ordered.forEach(v => {
+    [...spanish, ...others].forEach(v => {
       const opt = document.createElement('option');
       opt.value = v.name;
-      opt.textContent = `${v.name} (${v.lang})${v.default ? ' — por defecto' : ''}`;
+      opt.textContent = `${v.name} (${v.lang})`;
       voiceSelect.appendChild(opt);
     });
     const def = pickDefaultVoice();
     if (def) voiceSelect.value = def.name;
   }
-
-  populateVoices();
-  if (typeof synth.onvoiceschanged !== 'undefined') {
-    synth.onvoiceschanged = populateVoices;
+  if (synth) {
+    populateVoices();
+    if (typeof synth.onvoiceschanged !== 'undefined') synth.onvoiceschanged = populateVoices;
   }
 
-  // === Parpadeo aleatorio ===
+  function speakShort(text) {
+    if (!synth) return;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = voices.find(v => v.name === voiceSelect.value);
+    if (v) u.voice = v;
+    u.lang = v ? v.lang : 'es-MX';
+    u.rate = parseFloat(rateInput.value);
+    u.pitch = parseFloat(pitchInput.value);
+    u.onstart = () => robotWrap.classList.add('talking');
+    u.onend = () => robotWrap.classList.remove('talking');
+    if (retroInput.checked) speakRetro(text);
+    else synth.speak(u);
+  }
+  function speakRetro(text) {
+    const tokens = text.match(/[^\s]+/g) || [];
+    robotWrap.classList.add('talking');
+    const basePitch = parseFloat(pitchInput.value);
+    const baseRate  = parseFloat(rateInput.value);
+    let i = 0;
+    function step() {
+      if (i >= tokens.length) { robotWrap.classList.remove('talking'); return; }
+      const u = new SpeechSynthesisUtterance(tokens[i]);
+      const v = voices.find(v => v.name === voiceSelect.value);
+      if (v) u.voice = v;
+      u.lang = v ? v.lang : 'es-MX';
+      u.rate = baseRate;
+      const wobble = (i % 2 ? 0.04 : -0.04) + (Math.random() - .5) * 0.04;
+      u.pitch = Math.max(0.1, Math.min(2, basePitch + wobble));
+      u.onend = () => {
+        const tail = tokens[i].slice(-1);
+        const pause = /[,;:]/.test(tail) ? 160 : /[.!?]/.test(tail) ? 260 : 70;
+        i++;
+        setTimeout(step, pause);
+      };
+      synth.speak(u);
+    }
+    step();
+  }
+
+  // === Parpadeo aleatorio de los ojos ===
   function blinkOccasionally() {
     const delay = 2500 + Math.random() * 3500;
     setTimeout(() => {
@@ -232,163 +484,7 @@
   }
   blinkOccasionally();
 
-  // === Hablar ===
-  function makeUtter(text) {
-    const u = new SpeechSynthesisUtterance(text);
-    const chosen = voices.find(v => v.name === voiceSelect.value);
-    if (chosen) u.voice = chosen;
-    u.lang = chosen ? chosen.lang : 'es-MX';
-    u.rate  = parseFloat(rateInput.value);
-    u.pitch = parseFloat(pitchInput.value);
-    return u;
-  }
-
-  function speakNormal(text) {
-    const u = makeUtter(text);
-    u.onstart = () => { robotWrap.classList.add('talking'); };
-    u.onend = () => { robotWrap.classList.remove('talking'); };
-    u.onerror = onTalkError;
-    synth.speak(u);
-  }
-
-  function speakRetro(text) {
-    const tokens = text.match(/[^\s]+/g) || [];
-    if (tokens.length === 0) return;
-    robotWrap.classList.add('talking');
-
-    const basePitch = parseFloat(pitchInput.value);
-    const baseRate  = parseFloat(rateInput.value);
-    let stopped = false;
-
-    function speakIdx(i) {
-      if (stopped || i >= tokens.length) {
-        robotWrap.classList.remove('talking');
-        return;
-      }
-      const u = makeUtter(tokens[i]);
-      const wobble = (i % 2 === 0 ? -0.05 : 0.05) + (Math.random() - 0.5) * 0.06;
-      u.pitch = Math.max(0.1, Math.min(2, basePitch + wobble));
-      u.rate  = baseRate;
-      u.onend = () => {
-        const tail = tokens[i].slice(-1);
-        const pause = /[,;:]/.test(tail) ? 180 :
-                      /[.!?]/.test(tail) ? 280 : 80;
-        setTimeout(() => speakIdx(i + 1), pause);
-      };
-      u.onerror = onTalkError;
-      synth.speak(u);
-    }
-    activeRetroStopper = () => { stopped = true; };
-    speakIdx(0);
-  }
-
-  let activeRetroStopper = null;
-  function onTalkError() {
-    robotWrap.classList.remove('talking');
-  }
-
-  function speakText(text) {
-    synth.cancel();
-    if (activeRetroStopper) { activeRetroStopper(); activeRetroStopper = null; }
-    if (retroInput.checked) speakRetro(text); else speakNormal(text);
-  }
-
-  function tellJoke()    { speakText(JOKES[pickRandom(JOKES, 'joke')]); }
-  function tellTrivia()  { speakText(TRIVIAS[pickRandom(TRIVIAS, 'trivia')]); }
-
-  // === Caja sorpresa: una de varias cosas al azar ===
-  function showSurpriseBox(html) {
-    surpriseContent.innerHTML = html;
-    surpriseBox.hidden = false;
-    surpriseBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-  function hideSurpriseBox() {
-    surpriseBox.hidden = true;
-    surpriseContent.innerHTML = '';
-  }
-  closeSurprise.addEventListener('click', hideSurpriseBox);
-
-  async function fetchPet() {
-    // 50% gato, 50% perro - APIs públicas sin key
-    const isCat = Math.random() < 0.5;
-    try {
-      if (isCat) {
-        const r = await fetch('https://api.thecatapi.com/v1/images/search');
-        const data = await r.json();
-        return { url: data[0].url, kind: 'gato' };
-      } else {
-        const r = await fetch('https://dog.ceo/api/breeds/image/random');
-        const data = await r.json();
-        return { url: data.message, kind: 'perro' };
-      }
-    } catch (e) {
-      return null;
-    }
-  }
-
-  async function surpriseWithPet() {
-    showSurpriseBox('<p class="loading">Buscando una foto bonita... 📸</p>');
-    const pet = await fetchPet();
-    if (!pet) {
-      hideSurpriseBox();
-      speakText("Mis sensores fallaron buscando la foto. Vuelve a intentarlo.");
-      return;
-    }
-    const caption = pet.kind === 'gato'
-      ? "Te tengo un gatito. Mira esos ojitos."
-      : "Te tengo un perrito. Es para alegrar el día.";
-    showSurpriseBox(`
-      <p class="surprise-caption">${caption}</p>
-      <img src="${pet.url}" alt="Foto de un ${pet.kind}" class="pet-photo" />
-    `);
-    speakText(caption);
-  }
-
-  function surpriseWithWikipedia() {
-    // Abrir EN EL CLICK (sincrónico) para que el navegador no bloquee el popup
-    const win = window.open('https://es.wikipedia.org/wiki/Especial:Aleatoria', '_blank', 'noopener');
-    const msg = "Te acabo de abrir un artículo aleatorio de Wikipedia. A ver qué te toca.";
-    if (!win) {
-      // Si bloqueó el popup, mostrar link clicable
-      showSurpriseBox(`
-        <p class="surprise-caption">${msg}</p>
-        <p><a href="https://es.wikipedia.org/wiki/Especial:Aleatoria" target="_blank" rel="noopener" class="surprise-link">Abrir Wikipedia aleatoria 📖</a></p>
-      `);
-    }
-    speakText(msg);
-  }
-
-  function surprise() {
-    hideSurpriseBox();
-    // Lista de tipos de sorpresa, cada uno con su función
-    const types = [
-      () => speakText(ROBOT_QUOTES[pickRandom(ROBOT_QUOTES, 'robot')]),
-      () => speakText(FUN_FACTS[pickRandom(FUN_FACTS, 'fact')]),
-      () => speakText(REFRANES[pickRandom(REFRANES, 'refran')]),
-      () => speakText(FORTUNES[pickRandom(FORTUNES, 'fortune')]),
-      () => speakText(CHALLENGES[pickRandom(CHALLENGES, 'challenge')]),
-      surpriseWithWikipedia,
-      surpriseWithPet,
-    ];
-    const idx = pickRandom(types, 'surprise');
-    types[idx]();
-  }
-
-  function stopSpeaking() {
-    synth.cancel();
-    if (activeRetroStopper) { activeRetroStopper(); activeRetroStopper = null; }
-    robotWrap.classList.remove('talking');
-  }
-
-  jokeBtn.addEventListener('click', tellJoke);
-  triviaBtn.addEventListener('click', tellTrivia);
-  surpriseBtn.addEventListener('click', surprise);
-  stopBtn.addEventListener('click', () => { stopSpeaking(); hideSurpriseBox(); });
-
-  if (!('speechSynthesis' in window)) {
-    jokeBtn.disabled = true;
-    triviaBtn.disabled = true;
-    surpriseBtn.disabled = true;
-    alert('Tu navegador no soporta la síntesis de voz. Prueba con Chrome, Edge o Safari.');
-  }
+  // === Arranque ===
+  if (hasKey()) showMain();
+  else          showSetup();
 })();
